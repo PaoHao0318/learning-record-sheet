@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}我的學習計畫{% endblock %}
+{% block body %}
+<div class="container-fluid mt-5" style="border: 2px solid #0056b3; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);">
+    <h1 class="text-center" style="color: #0056b3;">您的行程</h1>
+    <h3 id="schedule-title" class="text-center" style="color: #0056b3;">{{ selected_day.strftime('%Y 年 %m 月 %d 日的行程') if selected_day else today.strftime('%Y 年 %m 月 %d 日的行程') }}</h3>
+    <a href="{{ url_for('add_schedule') }}" class="btn btn-primary mb-3" style="background-color: #007bff; border-color: #007bff;">新增行程</a>
+    <div class="list-group" id="schedule-list" style="font-size: 1.4em; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);">
+        {% for schedule in schedules %}
+        {% if schedule.start_time.date() == (selected_day if selected_day else today) %}
+        <div class="list-group-item d-flex justify-content-between align-items-center schedule-item" style="border-bottom: 1px solid #ccc; padding: 15px;">
+            <div class="d-flex align-items-center">
+                <h5 class="mb-1 mr-3" style="font-weight: bold; color: #0056b3;">{{ schedule.title }}</h5>
+                <p class="mb-1 mr-3" style="font-weight: normal; color: #0056b3;">{{ schedule.description }}</p>
+                <small style="font-size: 0.9em; color: #888;">{{ schedule.start_time }} ~ {{ schedule.end_time }}</small>
+            </div>
+            <div>
+                <a href="{{ url_for('edit_schedule', schedule_id=schedule.id) }}" class="btn btn-sm btn-primary action-button" style="background-color: #007bff; border-color: #007bff;">編輯</a>
+                <form action="{{ url_for('delete_schedule', schedule_id=schedule.id) }}" method="POST" style="display: inline;"><button type="submit" class="btn btn-sm btn-info action-button" style="background-color: #17a2b8; border-color: #17a2b8;">刪除</button></form>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">目前沒有行程，請新增行程</p>
+        {% endfor %}
+    </div>
+    <div class="text-center mt-5">
+        <div class="d-flex justify-content-between align-items-center">
+            <a href="#" onclick="fetchWeekData('prev')" class="btn btn-link text-primary" style="font-size: 2em; color: #0056b3;">&laquo;</a>
+            <h3 class="mt-4" style="color: #0056b3;">每日讀書時間長條圖</h3>
+            <a href="#" onclick="fetchWeekData('next')" class="btn btn-link text-primary" style="font-size: 2em; color: #0056b3;">&raquo;</a>
+        </div>
+        <div style="border: 2px solid #0056b3; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);">
+            <canvas id="barChart"></canvas>
+        </div>
+    </div>
+    <div class="text-center mt-5">
+        <div class="row mt-5">
+            <div class="col-md-6 mb-5">
+                <div class="calendar-container mx-auto" style="max-width: 600px; height: 600px; font-size: 1.5em; text-align: center; border: 1px solid #0056b3; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); background-color: #f8f9fa; display: flex; flex-direction: column; justify-content: center; border-bottom: 2px solid #0056b3;">
+                    <div class="calendar-header d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('prev_month', year=current_year, month=current_month) }}" class="btn btn-link text-primary" style="font-size: 2em; color: #0056b3;">&laquo;</a>
+                        <h3 class="mx-auto">{{ current_year }} 年 {{ current_month }} 月</h3>
+                        <a href="{{ url_for('next_month', year=current_year, month=current_month) }}" class="btn btn-link text-primary" style="font-size: 2em; color: #0056b3;">&raquo;</a>
+                    </div>
+                    <div class="calendar-body mx-auto" style="font-size: 1.5em; text-align: center;">
+                        {{ calendar_html.replace('class="month"', 'class="month" style="text-align:center"').replace('class="sun"', 'class="mon"').replace('class="mon"', 'class="sun"') | safe }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-5">
+                <div class="chart-container mx-auto" style="max-width: 600px; height: 600px; font-size: 1.5em; text-align: center; border: 1px solid #0056b3; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); background-color: #f8f8f8; display: flex; flex-direction: column; justify-content: center; border-bottom: 2px solid #0056b3;">
+                    <h3 class="mb-4" style="color: #0056b3;">各科目讀書時間分配圓餅圖</h3>
+                    <canvas id="pieChart" style="flex-grow: 1;"></canvas>
+                </div>                
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+            // 調試：檢查後端傳來的數據是否正確
+        console.log("Labels (X 軸):", {{ days | tojson | safe }});
+        console.log("Data (Y 軸):", {{ study_hours | tojson | safe }});
+        var barCtx = document.getElementById('barChart').getContext('2d');
+        var barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ days | tojson | safe }},
+                datasets: [{
+                    label: '每日讀書時間',
+                    data: {{ study_hours | default([]) | tojson | safe }},
+                    backgroundColor: '#36A2EB',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 20
+                            }
+                        }
+                    },
+                    title: {
+                        display: false
+                    }
+                },
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 10,
+                        top: 10,
+                        bottom: 10
+                    }
+                },
+                animation: {
+                    duration: 1500,
+                    easing: 'easeInOutBounce'
+                }
+            }
+        });
+
+        var pieCtx = document.getElementById('pieChart').getContext('2d');
+        var pieChart = new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ subject_hours.keys() | default([]) | list | tojson | safe }},
+                datasets: [{
+                    label: '讀書時間分配',
+                    data: {{ subject_hours.values() | default([]) | list | tojson | safe }},
+                    backgroundColor: ['#36A2EB', '#4BC0C0', '#7AC5CD', '#89CFF0', '#00BFFF', '#4682B4'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 20
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: ' '
+                    }
+                },
+                animation: {
+                    duration: 1500,
+                    easing: 'easeInOutBounce'
+                }
+            }
+        });
+
+        window.selectDay = function(day) {
+            const currentYear = {{ current_year }};
+            const currentMonth = {{ current_month }};
+            const selectedDay = new Date(currentYear, currentMonth - 1, day);
+            
+            document.getElementById('schedule-title').innerText = `${selectedDay.getFullYear()} 年 ${selectedDay.getMonth() + 1} 月 ${selectedDay.getDate()} 日的行程`;
+            
+            fetch(`/get_pie_chart_data?year=${currentYear}&month=${currentMonth}&day=${day}`)
+                .then(response => response.json())
+                .then(data => {
+                    updatePieChart(data.labels, data.values);
+                    updateScheduleList(currentYear, currentMonth, day);
+                })
+                .catch(error => {
+                    console.error('Error fetching pie chart data:', error);
+                });
+        }
+
+        function updatePieChart(labels, values) {
+            pieChart.data.labels = labels;
+            pieChart.data.datasets[0].data = values;
+            pieChart.update();
+        }
+
+        function updateScheduleList(year, month, day) {
+            fetch(`/get_schedule_data?year=${year}&month=${month}&day=${day}`)
+                .then(response => response.json())
+                .then(data => {
+                    const scheduleList = document.getElementById('schedule-list');
+                    scheduleList.innerHTML = '';
+                    if (data.schedules.length > 0) {
+                        data.schedules.forEach(schedule => {
+                            const listItem = document.createElement('div');
+                            listItem.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center', 'schedule-item');
+                            listItem.style.borderBottom = '1px solid #ccc';
+                            listItem.style.padding = '15px';
+                            listItem.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <h5 class="mb-1 mr-3" style="font-weight: bold; color: #0056b3;">${schedule.title}</h5>
+                                    <p class="mb-1 mr-3" style="font-weight: normal; color: #0056b3;">${schedule.description}</p>
+                                    <small style="font-size: 0.9em; color: #888;">${schedule.start_time} ~ ${schedule.end_time}</small>
+                                </div>
+                                <div>
+                                    <a href="/edit_schedule/${schedule.id}" class="btn btn-sm btn-primary action-button" style="background-color: #007bff; border-color: #007bff;">編輯</a>
+                                    <form action="/delete_schedule/${schedule.id}" method="POST" style="display: inline;"><button type="submit" class="btn btn-sm btn-info action-button" style="background-color: #17a2b8; border-color: #17a2b8;">刪除</button></form>
+                                </div>
+                            `;
+                            scheduleList.appendChild(listItem);
+                        });
+                    } else {
+                        scheduleList.innerHTML = '<p class="text-muted">目前沒有行程，請新增行程</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching schedule data:', error);
+                });
+        }
+
+        window.fetchWeekData = function(direction) {
+            let weekStart = new Date('{{ week_start.strftime("%Y-%m-%d") }}');
+            if (direction === 'prev') {
+                weekStart.setDate(weekStart.getDate() - 7);
+            } else if (direction === 'next') {
+                weekStart.setDate(weekStart.getDate() + 7);
+            }
+            const weekStartStr = weekStart.toISOString().split('T')[0];
+            window.location.href = `/?week_start=${weekStartStr}`;
+        }        
+
+        // Add hover effect to buttons
+        const buttons = document.querySelectorAll('.action-button');
+        buttons.forEach(button => {
+            button.addEventListener('mouseover', () => {
+                button.style.transform = 'scale(1.1)';
+                button.style.transition = 'transform 0.2s ease-in-out';
+                button.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.2)';
+            });
+            button.addEventListener('mouseout', () => {
+                button.style.transform = 'scale(1)';
+                button.style.boxShadow = 'none';
+            });
+        });
+    });
+</script>
+
+{% endblock %}

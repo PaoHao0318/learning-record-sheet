@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}讀書時間可視化{% endblock %}
+{% block body %}
+<div class="container mt-5">
+    <h1 class="text-center">讀書時間可視化</h1>
+    <div class="text-center">
+        <h3 class="mt-4">每日讀書時間長條圖</h3>
+        <img src="{{ bar_chart_data }}" alt="每日讀書時間長條圖">
+        <h3 class="mt-4">各科目讀書時間分配圓餅圖</h3>
+        <img src="{{ pie_chart_data }}" alt="讀書時間分配圓餅圖">
+    </div>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4">返回首頁</a>
+</div>
+{% endblock %}

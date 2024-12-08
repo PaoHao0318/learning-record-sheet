@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}編輯行程{% endblock %}
+{% block body %}
+<div class="container mt-5">
+    <h1 class="text-center">編輯行程</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="title" class="form-label">標題</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ schedule.title }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">描述</label>
+            <textarea class="form-control" id="description" name="description" required>{{ schedule.description }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="start_time" class="form-label">開始時間</label>
+            <input type="datetime-local" class="form-control" id="start_time" name="start_time" value="{{ schedule.start_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="end_time" class="form-label">結束時間</label>
+            <input type="datetime-local" class="form-control" id="end_time" name="end_time" value="{{ schedule.end_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">保存更改</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">取消</a>
+    </form>
+</div>
+{% endblock %}
